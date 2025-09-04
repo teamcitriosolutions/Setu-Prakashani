@@ -1,0 +1,622 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  extensions = [pg_trgm]
+}
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres", "postgresqlExtensions"]
+}
+
+// Enums
+enum partner_type {
+  PRINTER
+  DTP
+  EDITOR
+  DESIGNER
+  PAPER_SUPPLIER
+  BINDER
+}
+
+enum book_kind {
+  HARDCOVER
+  PAPERBACK
+  EBOOK
+}
+
+enum book_binding {
+  PERFECT
+  SADDLE_STITCH
+  CASE
+}
+
+enum book_status {
+  IN_STOCK
+  FORTHCOMING
+}
+
+enum mv_dir {
+  IN
+  OUT
+}
+
+enum job_status {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum print_job_type {
+  INNER
+  COVER
+}
+
+enum job_order_type {
+  FIXED
+  PER_UNIT
+}
+
+enum payment_mode {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  BANK_TRANSFER
+}
+
+enum customer_source {
+  STORE
+  BOOK_FAIR
+  EXHIBITION
+  OTHER
+}
+
+enum cart_status {
+  ACTIVE
+  MERGED
+  ABANDONED
+  ORDERED
+}
+
+enum order_status {
+  PENDING
+  CONFIRMED
+  ALLOCATED
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum payment_status {
+  UNPAID
+  AUTHORIZED
+  PAID
+  PARTIAL_REFUND
+  REFUNDED
+  FAILED
+  DISPUTED
+}
+
+enum refund_status {
+  REQUESTED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum shipment_carrier {
+  DTDC
+  BLUEDART
+  INDIAPOST
+  SELF
+}
+
+enum shipping_method {
+  STANDARD
+  EXPRESS
+  PICKUP
+}
+
+enum shipment_status {
+  READY
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  RTO
+  LOST
+  CANCELLED
+}
+
+enum stage {
+  DTP
+  EDITING
+  PROOFREADING
+  COVER_DESIGN
+  COVER_SETTING
+  PRINTING
+  LAMINATION
+  BINDING
+}
+
+// Models
+model languages {
+  id    BigInt  @id @default(autoincrement())
+  code  String  @unique
+  name  String
+  books books[]
+}
+
+model categories {
+  id                 BigInt               @id @default(autoincrement())
+  name               String               @unique
+  books              books[]
+  customer_interests customer_interests[]
+}
+
+model addresses {
+  id                 BigInt               @id @default(autoincrement())
+  line1              String
+  line2              String?
+  city               String
+  state              String?
+  pincode            String
+  country            String
+  created_at         DateTime             @default(now()) @db.Timestamptz
+  updated_at         DateTime             @updatedAt @db.Timestamptz
+  partners           partners[]
+  warehouses         warehouses[]
+  customer_addresses customer_addresses[]
+  orders_billing     orders[]             @relation("billing")
+  orders_shipping    orders[]             @relation("shipping")
+  shipments          shipments[]          @relation("shipping")
+}
+
+model partners {
+  id                  BigInt                @id @default(autoincrement())
+  name                String
+  type                partner_type
+  contact_person      String?
+  phone               String?               @db.VarChar(10)
+  email               String?
+  gst_no              String?
+  address_id          BigInt
+  active              Boolean               @default(true)
+  created_at          DateTime              @default(now()) @db.Timestamptz
+  updated_at          DateTime              @updatedAt @db.Timestamptz
+  address             addresses             @relation(fields: [address_id], references: [id])
+  book_jobs           book_jobs[]
+  paper_supply_orders paper_supply_orders[]
+  print_runs_inner    print_runs[]          @relation("printer_inner")
+  print_runs_cover    print_runs[]          @relation("printer_cover")
+}
+
+model authors {
+  id           BigInt         @id @default(autoincrement())
+  name         String
+  email        String?
+  phone        String?        @db.VarChar(10)
+  notes        String?
+  created_at   DateTime       @default(now()) @db.Timestamptz
+  updated_at   DateTime       @updatedAt @db.Timestamptz
+  book_authors book_authors[]
+}
+
+model books {
+  id                 BigInt            @id @default(autoincrement())
+  isbn_13            String?           @unique
+  isbn_10            String?           @unique
+  title              String
+  subtitle           String?
+  description        String?
+  sample_preview_url String?
+  language_id        BigInt
+  category_id        BigInt
+  edition            Int?
+  publication_year   Int?
+  kind               book_kind?
+  binding            book_binding?
+  page_count         Int?
+  trim_size_mm       String?
+  mrp                Decimal?          @db.Decimal(10, 2)
+  status             book_status?
+  stock_qty          Int?              @default(0)
+  created_at         DateTime          @default(now()) @db.Timestamptz
+  updated_at         DateTime          @updatedAt @db.Timestamptz
+  language           languages         @relation(fields: [language_id], references: [id])
+  category           categories        @relation(fields: [category_id], references: [id])
+  book_authors       book_authors[]
+  book_jobs          book_jobs[]
+  print_runs         print_runs[]
+  stock_movements    stock_movements[]
+  cart_items         cart_items[]
+  order_items        order_items[]
+  exam_requests      exam_requests[]
+  wishlists          wishlists[]
+  reviews            reviews[]
+  book_stages        book_stages?
+}
+
+model book_authors {
+  book_id   BigInt  @map("book_id")
+  author_id BigInt  @map("author_id")
+  role      String
+  book      books   @relation(fields: [book_id], references: [id])
+  author    authors @relation(fields: [author_id], references: [id])
+
+  @@id([book_id, author_id, role])
+}
+
+model book_jobs {
+  id             BigInt         @id @default(autoincrement())
+  book_id        BigInt
+  partner_id     BigInt
+  stage          stage
+  status         job_status
+  date_received  DateTime?      @db.Date
+  date_started   DateTime?      @db.Date
+  due_date       DateTime?      @db.Date
+  date_completed DateTime?      @db.Date
+  qty_expected   Int?
+  qty_completed  Int?
+  unit_cost      Decimal?       @db.Decimal(10, 2)
+  order_type     job_order_type
+  rate           Decimal?       @db.Decimal(10, 2)
+  total          Decimal?       @db.Decimal(10, 2)
+  is_paid        Boolean        @default(false)
+  payment_mode   payment_mode?
+  is_due         Boolean        @default(false)
+  notes          String?
+  created_at     DateTime       @default(now()) @db.Timestamptz
+  updated_at     DateTime       @updatedAt @db.Timestamptz
+  book           books          @relation(fields: [book_id], references: [id])
+  partner        partners       @relation(fields: [partner_id], references: [id])
+}
+
+model book_stages {
+  id            BigInt     @id @default(autoincrement())
+  book_id       BigInt     @unique
+  stage         stage
+  status        job_status
+  last_event_at DateTime?  @db.Date
+  created_at    DateTime   @default(now()) @db.Timestamptz
+  updated_at    DateTime   @updatedAt @db.Timestamptz
+  book          books      @relation(fields: [book_id], references: [id])
+}
+
+model warehouses {
+  id                 BigInt               @id @default(autoincrement())
+  name               String               @unique
+  address_id         BigInt
+  created_at         DateTime             @default(now()) @db.Timestamptz
+  updated_at         DateTime             @updatedAt @db.Timestamptz
+  address            addresses            @relation(fields: [address_id], references: [id])
+  stock_movements    stock_movements[]
+  shipments          shipments[]
+  stock_reservations stock_reservations[]
+}
+
+model print_runs {
+  id               BigInt            @id @default(autoincrement())
+  book_id          BigInt
+  run_no           Int
+  qty_received     Int
+  date_received    DateTime?         @db.Date
+  printer_inner_id BigInt?
+  printer_cover_id BigInt?
+  created_at       DateTime          @default(now()) @db.Timestamptz
+  updated_at       DateTime          @updatedAt @db.Timestamptz
+  book             books             @relation(fields: [book_id], references: [id])
+  printer_inner    partners?         @relation("printer_inner", fields: [printer_inner_id], references: [id])
+  printer_cover    partners?         @relation("printer_cover", fields: [printer_cover_id], references: [id])
+  stock_movements  stock_movements[]
+}
+
+model stock_movements {
+  id           BigInt      @id @default(autoincrement())
+  book_id      BigInt
+  print_run_id BigInt?
+  warehouse_id BigInt
+  dir          mv_dir
+  qty          Int
+  reason       String?
+  ref_table    String?
+  ref_id       BigInt?
+  occurred_at  DateTime    @default(now()) @db.Timestamptz
+  created_at   DateTime    @default(now()) @db.Timestamptz
+  updated_at   DateTime    @updatedAt @db.Timestamptz
+  book         books       @relation(fields: [book_id], references: [id])
+  print_run    print_runs? @relation(fields: [print_run_id], references: [id])
+  warehouse    warehouses  @relation(fields: [warehouse_id], references: [id])
+}
+
+model paper_supply_orders {
+  id             BigInt         @id @default(autoincrement())
+  partner_id     BigInt
+  status         job_status
+  date_expected  DateTime?      @db.Date
+  date_completed DateTime?      @db.Date
+  qty            Int?
+  unit_cost      Decimal?       @db.Decimal(10, 2)
+  order_type     job_order_type
+  rate           Decimal?       @db.Decimal(10, 2)
+  total          Decimal?       @db.Decimal(10, 2)
+  is_paid        Boolean        @default(false)
+  payment_mode   payment_mode?
+  is_due         Boolean        @default(false)
+  notes          String?
+  partner        partners       @relation(fields: [partner_id], references: [id])
+}
+
+model customers {
+  id                 String               @id // Clerk user ID
+  name               String
+  phone              String?              @db.VarChar(10)
+  email              String?
+  source             customer_source
+  fair_exhibition    String?
+  created_at         DateTime             @default(now()) @db.Timestamptz
+  updated_at         DateTime             @updatedAt @db.Timestamptz
+  customer_interests customer_interests[]
+  customer_addresses customer_addresses[]
+  carts              carts[]
+  orders             orders[]
+  exam_requests      exam_requests[]
+  wishlists          wishlists[]
+  reviews            reviews[]
+}
+
+model customer_interests {
+  customer_id  String      @id // Clerk user ID
+  category_id  BigInt[]
+  created_at   DateTime    @default(now()) @db.Timestamptz
+  updated_at   DateTime    @updatedAt @db.Timestamptz
+  customer     customers   @relation(fields: [customer_id], references: [id])
+  categories   categories? @relation(fields: [categoriesId], references: [id])
+  categoriesId BigInt?
+}
+
+model customer_addresses {
+  id                  BigInt    @id @default(autoincrement())
+  customer_id         String // Clerk user ID
+  address_id          BigInt
+  is_default_shipping Boolean   @default(false)
+  is_default_billing  Boolean   @default(false)
+  created_at          DateTime  @default(now()) @db.Timestamptz
+  updated_at          DateTime  @updatedAt @db.Timestamptz
+  customer            customers @relation(fields: [customer_id], references: [id])
+  address             addresses @relation(fields: [address_id], references: [id])
+}
+
+model carts {
+  id          BigInt       @id @default(autoincrement())
+  customer_id String? // Clerk user ID
+  token       String?      @unique
+  status      cart_status
+  currency    String
+  created_at  DateTime     @default(now()) @db.Timestamptz
+  updated_at  DateTime     @updatedAt @db.Timestamptz
+  customer    customers?   @relation(fields: [customer_id], references: [id])
+  cart_items  cart_items[]
+  orders      orders[]
+}
+
+model cart_items {
+  id         BigInt   @id @default(autoincrement())
+  cart_id    BigInt
+  book_id    BigInt
+  qty        Int
+  unit_price Decimal  @db.Decimal(10, 2)
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+  cart       carts    @relation(fields: [cart_id], references: [id])
+  book       books    @relation(fields: [book_id], references: [id])
+}
+
+model orders {
+  id                  BigInt         @id @default(autoincrement())
+  order_no            String         @unique
+  customer_id         String // Clerk user ID
+  cart_id             BigInt
+  coupon_id           BigInt?
+  billing_address_id  BigInt
+  shipping_address_id BigInt
+  status              order_status
+  payment_status      payment_status
+  currency            String
+  subtotal            Decimal        @db.Decimal(10, 2)
+  discount_total      Decimal        @db.Decimal(10, 2)
+  tax_total           Decimal        @db.Decimal(10, 2)
+  shipping_fee        Decimal        @db.Decimal(10, 2)
+  grand_total         Decimal        @db.Decimal(10, 2)
+  notes               String?
+  placed_at           DateTime       @default(now()) @db.Timestamptz
+  created_at          DateTime       @default(now()) @db.Timestamptz
+  updated_at          DateTime       @updatedAt @db.Timestamptz
+  customer            customers      @relation(fields: [customer_id], references: [id])
+  cart                carts          @relation(fields: [cart_id], references: [id])
+  coupon              coupons?       @relation(fields: [coupon_id], references: [id])
+  billing_address     addresses      @relation("billing", fields: [billing_address_id], references: [id])
+  shipping_address    addresses      @relation("shipping", fields: [shipping_address_id], references: [id])
+  order_items         order_items[]
+  order_events        order_events[]
+  payments            payments[]
+  shipments           shipments[]
+}
+
+model order_items {
+  id                 BigInt               @id @default(autoincrement())
+  order_id           BigInt
+  book_id            BigInt
+  qty                Int
+  unit_price         Decimal              @db.Decimal(10, 2)
+  discount_amount    Decimal              @db.Decimal(10, 2)
+  tax_amount         Decimal              @db.Decimal(10, 2)
+  line_total         Decimal              @db.Decimal(10, 2)
+  created_at         DateTime             @default(now()) @db.Timestamptz
+  updated_at         DateTime             @updatedAt @db.Timestamptz
+  order              orders               @relation(fields: [order_id], references: [id])
+  book               books                @relation(fields: [book_id], references: [id])
+  shipment_items     shipment_items[]
+  stock_reservations stock_reservations[]
+}
+
+model order_events {
+  id          BigInt        @id @default(autoincrement())
+  order_id    BigInt
+  event_type  String
+  from_status order_status?
+  to_status   order_status?
+  occurred_at DateTime      @default(now()) @db.Timestamptz
+  note        String?
+  order       orders        @relation(fields: [order_id], references: [id])
+}
+
+model payments {
+  id                  BigInt         @id @default(autoincrement())
+  order_id            BigInt
+  amount              Decimal        @db.Decimal(10, 2)
+  status              payment_status
+  mode                payment_mode
+  provider            String?
+  provider_order_id   String?
+  provider_payment_id String?
+  authorized_at       DateTime?      @db.Timestamptz
+  captured_at         DateTime?      @db.Timestamptz
+  failed_at           DateTime?      @db.Timestamptz
+  created_at          DateTime       @default(now()) @db.Timestamptz
+  updated_at          DateTime       @updatedAt @db.Timestamptz
+  order               orders         @relation(fields: [order_id], references: [id])
+  refunds             refunds[]
+}
+
+model refunds {
+  id                 BigInt        @id @default(autoincrement())
+  payment_id         BigInt
+  amount             Decimal       @db.Decimal(10, 2)
+  status             refund_status
+  reason             String?
+  provider_refund_id String?
+  refunded_at        DateTime?     @db.Timestamptz
+  created_at         DateTime      @default(now()) @db.Timestamptz
+  updated_at         DateTime      @updatedAt @db.Timestamptz
+  payment            payments      @relation(fields: [payment_id], references: [id])
+}
+
+model shipments {
+  id                  BigInt           @id @default(autoincrement())
+  order_id            BigInt
+  warehouse_id        BigInt
+  shipping_address_id BigInt
+  carrier             shipment_carrier
+  method              shipping_method
+  status              shipment_status
+  tracking_no         String?
+  shipped_at          DateTime?        @db.Timestamptz
+  delivered_at        DateTime?        @db.Timestamptz
+  created_at          DateTime         @default(now()) @db.Timestamptz
+  updated_at          DateTime         @updatedAt @db.Timestamptz
+  order               orders           @relation(fields: [order_id], references: [id])
+  warehouse           warehouses       @relation(fields: [warehouse_id], references: [id])
+  shipping_address    addresses        @relation("shipping", fields: [shipping_address_id], references: [id])
+  shipment_items      shipment_items[]
+}
+
+model shipment_items {
+  id            BigInt      @id @default(autoincrement())
+  shipment_id   BigInt
+  order_item_id BigInt
+  qty           Int
+  shipment      shipments   @relation(fields: [shipment_id], references: [id])
+  order_item    order_items @relation(fields: [order_item_id], references: [id])
+}
+
+model stock_reservations {
+  id            BigInt      @id @default(autoincrement())
+  order_item_id BigInt
+  warehouse_id  BigInt
+  qty           Int
+  reserved_at   DateTime    @default(now()) @db.Timestamptz
+  released_at   DateTime?   @db.Timestamptz
+  order_item    order_items @relation(fields: [order_item_id], references: [id])
+  warehouse     warehouses  @relation(fields: [warehouse_id], references: [id])
+}
+
+model coupons {
+  id          BigInt    @id @default(autoincrement())
+  code        String    @unique
+  type        String // percent, flat
+  value       Decimal   @db.Decimal(10, 2)
+  min_order   Decimal?  @db.Decimal(10, 2)
+  valid_until DateTime? @db.Timestamptz
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  orders      orders[]
+}
+
+model exam_requests {
+  id          BigInt    @id @default(autoincrement())
+  user_id     String // Clerk user ID
+  book_id     BigInt
+  institution String
+  purpose     String
+  status      String // received, reviewing, approved, rejected
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  book        books     @relation(fields: [book_id], references: [id])
+  customer    customers @relation(fields: [user_id], references: [id])
+}
+
+model wishlists {
+  id         BigInt     @id @default(autoincrement())
+  user_id    String? // Clerk user ID
+  session_id String? // Guest session
+  book_id    BigInt
+  created_at DateTime   @default(now()) @db.Timestamptz
+  updated_at DateTime   @updatedAt @db.Timestamptz
+  book       books      @relation(fields: [book_id], references: [id])
+  customer   customers? @relation(fields: [user_id], references: [id])
+}
+
+model reviews {
+  id           BigInt    @id @default(autoincrement())
+  book_id      BigInt
+  user_id      String // Clerk user ID
+  rating       Int // 1-5 stars
+  comment      String?
+  is_moderated Boolean   @default(false)
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
+  book         books     @relation(fields: [book_id], references: [id])
+  customer     customers @relation(fields: [user_id], references: [id])
+}
+
+model blogs {
+  id           BigInt    @id @default(autoincrement())
+  slug         String    @unique
+  title        String
+  category     String?
+  published_at DateTime? @db.Timestamptz
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
+}
+
+// Views (kept commented out for now)
+// model v_inventory_on_hand {
+//   book_id      BigInt
+//   warehouse_id BigInt
+//   qty_on_hand  Int
+//   book         books      @relation(fields: [book_id], references: [id])
+//   warehouse    warehouses @relation(fields: [warehouse_id], references: [id])
+// }
+
+// model v_book_stage_latest {
+//   book_id       BigInt
+//   stage         stage
+//   status        job_status
+//   last_event_at DateTime? @db.Date
+//   book          books     @relation(fields: [book_id], references: [id])
+// }
