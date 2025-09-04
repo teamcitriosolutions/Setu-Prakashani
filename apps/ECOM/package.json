@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "ecom",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@repo/ui": "*",
+    "@repo/db": "*",
     "next": "^15.5.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
