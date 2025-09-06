@@ -163,7 +163,7 @@ enum discount_target {
   SHIPPING
 }
 
-// Models
+//  Product Catalog & Core Content
 model languages {
   id    BigInt  @id @default(autoincrement())
   code  String  @unique
@@ -181,56 +181,6 @@ model categories {
   discount_categories discount_categories[]
   
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
-}
-
-model addresses {
-  id                 BigInt               @id @default(autoincrement())
-  line1              String
-  line2              String?
-  city               String
-  state              String?
-  pincode            String
-  country            String
-  created_at         DateTime             @default(now()) @db.Timestamptz
-  updated_at         DateTime             @updatedAt @db.Timestamptz
-  partners           partners[]
-  warehouses         warehouses[]
-  customer_addresses customer_addresses[]
-  orders_billing     orders[]             @relation("billing")
-  orders_shipping    orders[]             @relation("shipping")
-  shipments          shipments[]          @relation("shipping")
-  invoices           invoices[]
-}
-
-model partners {
-  id                  BigInt                @id @default(autoincrement())
-  name                String
-  type                partner_type
-  contact_person      String?
-  phone               String?               @db.VarChar(10)
-  email               String?
-  gst_no              String?
-  address_id          BigInt
-  active              Boolean               @default(true)
-  created_at          DateTime              @default(now()) @db.Timestamptz
-  updated_at          DateTime              @updatedAt @db.Timestamptz
-  address             addresses             @relation(fields: [address_id], references: [id])
-  paper_supply_orders paper_supply_orders[]
-  print_runs_inner    print_runs[]          @relation("printer_inner")
-  print_runs_cover    print_runs[]          @relation("printer_cover")
-  dtp_jobs            dtp_jobs[]
-  editing_jobs        editing_jobs[]
-  proofreading_jobs   proofreading_jobs[]
-  printing_jobs       printing_jobs[]
-  cover_design_jobs   cover_design_jobs[]
-  cover_setting_jobs  cover_setting_jobs[]
-  lamination_jobs     lamination_jobs[]
-  binding_jobs        binding_jobs[]
-  
-  @@index([address_id])
-  @@index([type])
-  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
-  // @@index([contact_person(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model authors {
@@ -318,94 +268,40 @@ model book_authors {
   @@index([author_id])
 }
 
-model warehouses {
-  id                  BigInt                @id @default(autoincrement())
-  name                String                @unique
-  address_id          BigInt
-  created_at          DateTime              @default(now()) @db.Timestamptz
-  updated_at          DateTime              @updatedAt @db.Timestamptz
-  address             addresses             @relation(fields: [address_id], references: [id])
-  stock_movements     stock_movements[]
-  shipments           shipments[]
-  stock_reservations  stock_reservations[]
-  invoices            invoices[]
-  v_inventory_on_hand v_inventory_on_hand[] @ignore
+model blogs {
+  id           BigInt    @id @default(autoincrement())
+  slug         String    @unique
+  title        String
+  category     String?
+  published_at DateTime? @db.Timestamptz
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
 
-  @@index([address_id])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([category])
 }
 
-model print_runs {
-  id               BigInt            @id @default(autoincrement())
-  book_id          BigInt
-  run_no           Int
-  qty_received     Int
-  date_received    DateTime?         @db.Date
-  printer_inner_id BigInt?
-  printer_cover_id BigInt?
-  created_at       DateTime          @default(now()) @db.Timestamptz
-  updated_at       DateTime          @updatedAt @db.Timestamptz
-  book             books             @relation(fields: [book_id], references: [id])
-  printer_inner    partners?         @relation("printer_inner", fields: [printer_inner_id], references: [id])
-  printer_cover    partners?         @relation("printer_cover", fields: [printer_cover_id], references: [id])
-  stock_movements  stock_movements[]
-  
+// Customers & User Engagement
 
-  @@index([book_id])
-  @@index([printer_inner_id])
-  @@index([printer_cover_id])
-  @@index([run_no])
-  }
-
-model stock_movements {
-  id           BigInt      @id @default(autoincrement())
-  book_id      BigInt
-  print_run_id BigInt?
-  warehouse_id BigInt
-  dir          mv_dir
-  qty          Int
-  reason       String?
-  ref_table    String?
-  ref_id       BigInt?
-  occurred_at  DateTime    @default(now()) @db.Timestamptz
-  created_at   DateTime    @default(now()) @db.Timestamptz
-  updated_at   DateTime    @updatedAt @db.Timestamptz
-  book         books       @relation(fields: [book_id], references: [id])
-  print_run    print_runs? @relation(fields: [print_run_id], references: [id])
-  warehouse    warehouses  @relation(fields: [warehouse_id], references: [id])
-
-  @@index([book_id])
-  @@index([print_run_id])
-  @@index([warehouse_id])
-  @@index([dir])
-  @@index([reason(ops: raw("gin_trgm_ops"))], type: Gin)
+model addresses {
+  id                 BigInt               @id @default(autoincrement())
+  line1              String
+  line2              String?
+  city               String
+  state              String?
+  pincode            String
+  country            String
+  created_at         DateTime             @default(now()) @db.Timestamptz
+  updated_at         DateTime             @updatedAt @db.Timestamptz
+  partners           partners[]
+  warehouses         warehouses[]
+  customer_addresses customer_addresses[]
+  orders_billing     orders[]             @relation("billing")
+  orders_shipping    orders[]             @relation("shipping")
+  shipments          shipments[]          @relation("shipping")
+  invoices           invoices[]
 }
 
-model paper_supply_orders {
-  id             BigInt         @id @default(autoincrement())
-  partner_id     BigInt
-  status         job_status
-  date_expected  DateTime?      @db.Date
-  date_completed DateTime?      @db.Date
-  qty            Int?
-  unit_cost      Decimal?       @db.Decimal(10, 2)
-  order_type     job_order_type
-  rate           Decimal?       @db.Decimal(10, 2)
-  total          Decimal?       @db.Decimal(10, 2)
-  is_paid        Boolean        @default(false)
-  payment_mode   payment_mode?
-  is_due         Boolean        @default(false)
-  notes          String?
-  created_at     DateTime       @default(now()) @db.Timestamptz
-  updated_at     DateTime       @updatedAt @db.Timestamptz
-  partner        partners       @relation(fields: [partner_id], references: [id])
-
-  @@index([partner_id])
-  @@index([status])
-  @@index([date_expected])
-  @@index([date_completed])
-}
-
-/// Customer accounts (safe public id available via `uuid`)
 model customers {
   id                   BigInt                 @id @default(autoincrement())
   uuid                 String                 @unique @default(uuid())
@@ -455,6 +351,59 @@ model customer_addresses {
   address             addresses @relation(fields: [address_id], references: [id])
 }
 
+model exam_requests {
+  id          BigInt    @id @default(autoincrement())
+  user_id     BigInt
+  book_id     BigInt
+  institution String
+  purpose     String
+  status      String // received, reviewing, approved, rejected
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  book        books     @relation(fields: [book_id], references: [id])
+  customer    customers @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([book_id])
+  @@index([status])
+  @@index([created_at])
+}
+
+model wishlists {
+  id         BigInt     @id @default(autoincrement())
+  user_id    BigInt?
+  session_id String?
+  book_id    BigInt
+  created_at DateTime   @default(now()) @db.Timestamptz
+  updated_at DateTime   @updatedAt @db.Timestamptz
+  book       books      @relation(fields: [book_id], references: [id])
+  customer   customers? @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([session_id])
+  @@index([book_id])
+}
+
+model reviews {
+  id           BigInt    @id @default(autoincrement())
+  book_id      BigInt
+  user_id      BigInt
+  rating       Int
+  comment      String?
+  is_moderated Boolean   @default(false)
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @updatedAt @db.Timestamptz
+  book         books     @relation(fields: [book_id], references: [id])
+  customer     customers @relation(fields: [user_id], references: [id])
+
+  @@index([book_id])
+  @@index([user_id])
+  @@index([rating])
+  @@index([comment(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+// E-commerce & Online Sales Flow
+
 model carts {
   id             BigInt           @id @default(autoincrement())
   customer_id    BigInt?
@@ -487,7 +436,6 @@ model cart_items {
   @@index([book_id])
 }
 
-/// Customer orders (safe public id available via `uuid`)
 model orders {
   id                   BigInt                 @id @default(autoincrement())
   order_no             String                 @unique
@@ -549,89 +497,6 @@ model order_items {
   @@index([book_id])
 }
 
-// ===== Staff =====
-model staff {
-  id                BigInt              @id @default(autoincrement())
-  name              String
-  phone             String?             @db.VarChar(10)
-  email             String?
-  date_of_birth     DateTime?           @db.Date
-  aadhaar_number    String?
-  cv_url            String?
-  joining_date      DateTime?           @db.Date
-  salary            Decimal?            @db.Decimal(10, 2)
-  created_at        DateTime            @default(now()) @db.Timestamptz
-  updated_at        DateTime            @updatedAt @db.Timestamptz
-  invoices          invoices[]
-  homepage_trending homepage_trending[] @relation("homepage_trending_created_by")
-  homepage_upcoming homepage_upcoming[] @relation("homepage_upcoming_created_by")
-  discounts_created discounts[]         @relation("discount_created_by")
-
-  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
-}
-
-// ===== Offline Invoices =====
-/// Offline invoices (safe public id available via `uuid`)
-model invoices {
-  id                  BigInt          @id @default(autoincrement())
-  invoice_no          String          @unique
-  uuid                String          @unique @default(uuid())
-  status              invoice_status
-  customer_id         BigInt?
-  customer_name       String?
-  customer_phone      String?         @db.VarChar(10)
-  customer_email      String?
-  billing_address_id  BigInt?
-  warehouse_id        BigInt?
-  salesman_id         BigInt?
-  send_online_invoice Boolean         @default(false)
-  payment_mode        payment_mode?
-  payment_status      payment_status?
-  subtotal            Decimal         @db.Decimal(10, 2)
-  discount_total      Decimal         @db.Decimal(10, 2)
-  tax_total           Decimal         @db.Decimal(10, 2)
-  grand_total         Decimal         @db.Decimal(10, 2)
-  notes               String?
-  issued_at           DateTime?       @db.Timestamptz
-  finalized_at        DateTime?       @db.Timestamptz
-  created_at          DateTime        @default(now()) @db.Timestamptz
-  updated_at          DateTime        @updatedAt @db.Timestamptz
-
-  customer        customers?      @relation(fields: [customer_id], references: [id])
-  billing_address addresses?      @relation(fields: [billing_address_id], references: [id])
-  warehouse       warehouses?     @relation(fields: [warehouse_id], references: [id])
-  salesman        staff?          @relation(fields: [salesman_id], references: [id])
-  invoice_items   invoice_items[]
-
-  @@index([customer_id])
-  @@index([billing_address_id])
-  @@index([warehouse_id])
-  @@index([salesman_id])
-  @@index([status])
-  @@index([issued_at])
-  @@index([finalized_at])
-  @@index([customer_name(ops: raw("gin_trgm_ops"))], type: Gin)
-  // @@index([notes(ops: raw("gin_trgm_ops"))], type: Gin)
-}
-
-model invoice_items {
-  id              BigInt   @id @default(autoincrement())
-  invoice_id      BigInt
-  book_id         BigInt
-  qty             Int
-  unit_price      Decimal  @db.Decimal(10, 2)
-  discount_amount Decimal  @db.Decimal(10, 2)
-  tax_amount      Decimal  @db.Decimal(10, 2)
-  line_total      Decimal  @db.Decimal(10, 2)
-  created_at      DateTime @default(now()) @db.Timestamptz
-  updated_at      DateTime @updatedAt @db.Timestamptz
-  invoice         invoices @relation(fields: [invoice_id], references: [id])
-  book            books    @relation(fields: [book_id], references: [id])
-
-  @@index([invoice_id])
-  @@index([book_id])
-}
-
 model order_events {
   id          BigInt        @id @default(autoincrement())
   order_id    BigInt
@@ -684,6 +549,70 @@ model refunds {
   @@index([status])
 }
 
+// Shipping & Inventory
+
+model warehouses {
+  id                  BigInt                @id @default(autoincrement())
+  name                String                @unique
+  address_id          BigInt
+  created_at          DateTime              @default(now()) @db.Timestamptz
+  updated_at          DateTime              @updatedAt @db.Timestamptz
+  address             addresses             @relation(fields: [address_id], references: [id])
+  stock_movements     stock_movements[]
+  shipments           shipments[]
+  stock_reservations  stock_reservations[]
+  invoices            invoices[]
+  v_inventory_on_hand v_inventory_on_hand[] @ignore
+
+  @@index([address_id])
+}
+
+model print_runs {
+  id               BigInt            @id @default(autoincrement())
+  book_id          BigInt
+  run_no           Int
+  qty_received     Int
+  date_received    DateTime?         @db.Date
+  printer_inner_id BigInt?
+  printer_cover_id BigInt?
+  created_at       DateTime          @default(now()) @db.Timestamptz
+  updated_at       DateTime          @updatedAt @db.Timestamptz
+  book             books             @relation(fields: [book_id], references: [id])
+  printer_inner    partners?         @relation("printer_inner", fields: [printer_inner_id], references: [id])
+  printer_cover    partners?         @relation("printer_cover", fields: [printer_cover_id], references: [id])
+  stock_movements  stock_movements[]
+  
+
+  @@index([book_id])
+  @@index([printer_inner_id])
+  @@index([printer_cover_id])
+  @@index([run_no])
+}
+
+model stock_movements {
+  id           BigInt      @id @default(autoincrement())
+  book_id      BigInt
+  print_run_id BigInt?
+  warehouse_id BigInt
+  dir          mv_dir
+  qty          Int
+  reason       String?
+  ref_table    String?
+  ref_id       BigInt?
+  occurred_at  DateTime    @default(now()) @db.Timestamptz
+  created_at   DateTime    @default(now()) @db.Timestamptz
+  updated_at   DateTime    @updatedAt @db.Timestamptz
+  book         books       @relation(fields: [book_id], references: [id])
+  print_run    print_runs? @relation(fields: [print_run_id], references: [id])
+  warehouse    warehouses  @relation(fields: [warehouse_id], references: [id])
+
+  @@index([book_id])
+  @@index([print_run_id])
+  @@index([warehouse_id])
+  @@index([dir])
+  @@index([reason(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
 model shipments {
   id                  BigInt           @id @default(autoincrement())
   order_id            BigInt
@@ -734,73 +663,74 @@ model stock_reservations {
   @@index([warehouse_id])
 }
 
-// coupons model removed
-
-model exam_requests {
-  id          BigInt    @id @default(autoincrement())
-  user_id     BigInt
-  book_id     BigInt
-  institution String
-  purpose     String
-  status      String // received, reviewing, approved, rejected
-  created_at  DateTime  @default(now()) @db.Timestamptz
-  updated_at  DateTime  @updatedAt @db.Timestamptz
-  book        books     @relation(fields: [book_id], references: [id])
-  customer    customers @relation(fields: [user_id], references: [id])
-
-  @@index([user_id])
-  @@index([book_id])
-  @@index([status])
-  @@index([created_at])
-}
-
-model wishlists {
-  id         BigInt     @id @default(autoincrement())
-  user_id    BigInt?
-  session_id String?
-  book_id    BigInt
-  created_at DateTime   @default(now()) @db.Timestamptz
-  updated_at DateTime   @updatedAt @db.Timestamptz
-  book       books      @relation(fields: [book_id], references: [id])
-  customer   customers? @relation(fields: [user_id], references: [id])
-
-  @@index([user_id])
-  @@index([session_id])
-  @@index([book_id])
-}
-
-model reviews {
-  id           BigInt    @id @default(autoincrement())
+model v_inventory_on_hand {
   book_id      BigInt
-  user_id      BigInt
-  rating       Int
-  comment      String?
-  is_moderated Boolean   @default(false)
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
-  book         books     @relation(fields: [book_id], references: [id])
-  customer     customers @relation(fields: [user_id], references: [id])
+  warehouse_id BigInt
+  qty_on_hand  Int
+  book         books      @relation(fields: [book_id], references: [id])
+  warehouse    warehouses @relation(fields: [warehouse_id], references: [id])
 
-  @@index([book_id])
-  @@index([user_id])
-  @@index([rating])
-  @@index([comment(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@ignore
 }
 
-model blogs {
-  id           BigInt    @id @default(autoincrement())
-  slug         String    @unique
-  title        String
-  category     String?
-  published_at DateTime? @db.Timestamptz
-  created_at   DateTime  @default(now()) @db.Timestamptz
-  updated_at   DateTime  @updatedAt @db.Timestamptz
+// Production & Partner Workflow
 
-  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
-  @@index([category])
+model partners {
+  id                  BigInt                @id @default(autoincrement())
+  name                String
+  type                partner_type
+  contact_person      String?
+  phone               String?               @db.VarChar(10)
+  email               String?
+  gst_no              String?
+  address_id          BigInt
+  active              Boolean               @default(true)
+  created_at          DateTime              @default(now()) @db.Timestamptz
+  updated_at          DateTime              @updatedAt @db.Timestamptz
+  address             addresses             @relation(fields: [address_id], references: [id])
+  paper_supply_orders paper_supply_orders[]
+  print_runs_inner    print_runs[]          @relation("printer_inner")
+  print_runs_cover    print_runs[]          @relation("printer_cover")
+  dtp_jobs            dtp_jobs[]
+  editing_jobs        editing_jobs[]
+  proofreading_jobs   proofreading_jobs[]
+  printing_jobs       printing_jobs[]
+  cover_design_jobs   cover_design_jobs[]
+  cover_setting_jobs  cover_setting_jobs[]
+  lamination_jobs     lamination_jobs[]
+  binding_jobs        binding_jobs[]
+  
+  @@index([address_id])
+  @@index([type])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  // @@index([contact_person(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
-// ===== Production Workflow / Jobs =====
+model paper_supply_orders {
+  id             BigInt         @id @default(autoincrement())
+  partner_id     BigInt
+  status         job_status
+  date_expected  DateTime?      @db.Date
+  date_completed DateTime?      @db.Date
+  qty            Int?
+  unit_cost      Decimal?       @db.Decimal(10, 2)
+  order_type     job_order_type
+  rate           Decimal?       @db.Decimal(10, 2)
+  total          Decimal?       @db.Decimal(10, 2)
+  is_paid        Boolean        @default(false)
+  payment_mode   payment_mode?
+  is_due         Boolean        @default(false)
+  notes          String?
+  created_at     DateTime       @default(now()) @db.Timestamptz
+  updated_at     DateTime       @updatedAt @db.Timestamptz
+  partner        partners       @relation(fields: [partner_id], references: [id])
+
+  @@index([partner_id])
+  @@index([status])
+  @@index([date_expected])
+  @@index([date_completed])
+}
+
 model dtp_jobs {
   id             BigInt         @id @default(autoincrement())
   book_id        BigInt
@@ -1048,51 +978,18 @@ model binding_jobs {
   // @@index([notes(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
-// ===== Homepage Sections =====
-model homepage_trending {
-  id         BigInt    @id @default(autoincrement())
-  book_id    BigInt
-  position   Int
-  starts_at  DateTime?
-  ends_at    DateTime?
-  created_by BigInt?
-  note       String?
-  created_at DateTime  @default(now()) @db.Timestamptz
-  updated_at DateTime  @updatedAt @db.Timestamptz
-  book       books     @relation(fields: [book_id], references: [id])
-  creator    staff?    @relation("homepage_trending_created_by", fields: [created_by], references: [id])
+model v_book_stage_latest {
+  book_id       BigInt
+  stage         stage
+  status        job_status
+  last_event_at DateTime?  @db.Date
+  book          books      @relation(fields: [book_id], references: [id])
 
-  @@index([book_id])
-  @@index([created_by])
-  @@index([position])
+  @@ignore
 }
 
-model homepage_upcoming {
-  id                    BigInt    @id @default(autoincrement())
-  book_id               BigInt
-  expected_release_date DateTime? @db.Date
-  preorder_enabled      Boolean   @default(false)
-  position              Int
-  display_from          DateTime?
-  display_to            DateTime?
-  created_by            BigInt?
-  note                  String?
-  created_at            DateTime  @default(now()) @db.Timestamptz
-  updated_at            DateTime  @updatedAt @db.Timestamptz
-  book                  books     @relation(fields: [book_id], references: [id])
-  creator               staff?    @relation("homepage_upcoming_created_by", fields: [created_by], references: [id])
+// Marketing, Discounts & Promotions
 
-  @@index([book_id])
-  @@index([created_by])
-  @@index([preorder_enabled])
-  @@index([expected_release_date])
-}
-
-/**
- * ==========================
- * Coupons & Discounts
- * ==========================
- */
 model discounts {
   id                       BigInt          @id @default(autoincrement())
   name                     String
@@ -1270,23 +1167,124 @@ model cart_discounts {
   @@index([discount_code_id])
 }
 
-// Views (ignored in client generation)
-model v_inventory_on_hand {
-  book_id      BigInt
-  warehouse_id BigInt
-  qty_on_hand  Int
-  book         books      @relation(fields: [book_id], references: [id])
-  warehouse    warehouses @relation(fields: [warehouse_id], references: [id])
+model homepage_trending {
+  id         BigInt    @id @default(autoincrement())
+  book_id    BigInt
+  position   Int
+  starts_at  DateTime?
+  ends_at    DateTime?
+  created_by BigInt?
+  note       String?
+  created_at DateTime  @default(now()) @db.Timestamptz
+  updated_at DateTime  @updatedAt @db.Timestamptz
+  book       books     @relation(fields: [book_id], references: [id])
+  creator    staff?    @relation("homepage_trending_created_by", fields: [created_by], references: [id])
 
-  @@ignore
+  @@index([book_id])
+  @@index([created_by])
+  @@index([position])
 }
 
-model v_book_stage_latest {
-  book_id       BigInt
-  stage         stage
-  status        job_status
-  last_event_at DateTime?  @db.Date
-  book          books      @relation(fields: [book_id], references: [id])
+model homepage_upcoming {
+  id                    BigInt    @id @default(autoincrement())
+  book_id               BigInt
+  expected_release_date DateTime? @db.Date
+  preorder_enabled      Boolean   @default(false)
+  position              Int
+  display_from          DateTime?
+  display_to            DateTime?
+  created_by            BigInt?
+  note                  String?
+  created_at            DateTime  @default(now()) @db.Timestamptz
+  updated_at            DateTime  @updatedAt @db.Timestamptz
+  book                  books     @relation(fields: [book_id], references: [id])
+  creator               staff?    @relation("homepage_upcoming_created_by", fields: [created_by], references: [id])
 
-  @@ignore
+  @@index([book_id])
+  @@index([created_by])
+  @@index([preorder_enabled])
+  @@index([expected_release_date])
+}
+
+
+// Internal Operations & Offline Sales
+
+model staff {
+  id                BigInt              @id @default(autoincrement())
+  name              String
+  phone             String?             @db.VarChar(10)
+  email             String?
+  date_of_birth     DateTime?           @db.Date
+  aadhaar_number    String?
+  cv_url            String?
+  joining_date      DateTime?           @db.Date
+  salary            Decimal?            @db.Decimal(10, 2)
+  created_at        DateTime            @default(now()) @db.Timestamptz
+  updated_at        DateTime            @updatedAt @db.Timestamptz
+  invoices          invoices[]
+  homepage_trending homepage_trending[] @relation("homepage_trending_created_by")
+  homepage_upcoming homepage_upcoming[] @relation("homepage_upcoming_created_by")
+  discounts_created discounts[]         @relation("discount_created_by")
+
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model invoices {
+  id                  BigInt          @id @default(autoincrement())
+  invoice_no          String          @unique
+  uuid                String          @unique @default(uuid())
+  status              invoice_status
+  customer_id         BigInt?
+  customer_name       String?
+  customer_phone      String?         @db.VarChar(10)
+  customer_email      String?
+  billing_address_id  BigInt?
+  warehouse_id        BigInt?
+  salesman_id         BigInt?
+  send_online_invoice Boolean         @default(false)
+  payment_mode        payment_mode?
+  payment_status      payment_status?
+  subtotal            Decimal         @db.Decimal(10, 2)
+  discount_total      Decimal         @db.Decimal(10, 2)
+  tax_total           Decimal         @db.Decimal(10, 2)
+  grand_total         Decimal         @db.Decimal(10, 2)
+  notes               String?
+  issued_at           DateTime?       @db.Timestamptz
+  finalized_at        DateTime?       @db.Timestamptz
+  created_at          DateTime        @default(now()) @db.Timestamptz
+  updated_at          DateTime        @updatedAt @db.Timestamptz
+
+  customer        customers?      @relation(fields: [customer_id], references: [id])
+  billing_address addresses?      @relation(fields: [billing_address_id], references: [id])
+  warehouse       warehouses?     @relation(fields: [warehouse_id], references: [id])
+  salesman        staff?          @relation(fields: [salesman_id], references: [id])
+  invoice_items   invoice_items[]
+
+  @@index([customer_id])
+  @@index([billing_address_id])
+  @@index([warehouse_id])
+  @@index([salesman_id])
+  @@index([status])
+  @@index([issued_at])
+  @@index([finalized_at])
+  @@index([customer_name(ops: raw("gin_trgm_ops"))], type: Gin)
+  // @@index([notes(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model invoice_items {
+  id              BigInt   @id @default(autoincrement())
+  invoice_id      BigInt
+  book_id         BigInt
+  qty             Int
+  unit_price      Decimal  @db.Decimal(10, 2)
+  discount_amount Decimal  @db.Decimal(10, 2)
+  tax_amount      Decimal  @db.Decimal(10, 2)
+  line_total      Decimal  @db.Decimal(10, 2)
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+  invoice         invoices @relation(fields: [invoice_id], references: [id])
+  book            books    @relation(fields: [book_id], references: [id])
+
+  @@index([invoice_id])
+  @@index([book_id])
 }
